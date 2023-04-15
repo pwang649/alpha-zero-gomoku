@@ -10,16 +10,16 @@
 #include <thread_pool.h>
 #include <libtorch.h>
 
-class TreeNode {
+class TreeNode_serial {
  public:
   // friend class can access private variables
   friend class MCTS_serial;
 
-  TreeNode();
-  TreeNode(const TreeNode &node);
-  TreeNode(TreeNode *parent, double p_sa, unsigned action_size);
+  TreeNode_serial();
+  TreeNode_serial(const TreeNode_serial &node);
+  TreeNode_serial(TreeNode_serial *parent, double p_sa, unsigned action_size);
 
-  TreeNode &operator=(const TreeNode &p);
+  TreeNode_serial &operator=(const TreeNode_serial &p);
 
   unsigned int select(double c_puct);
   void expand(const std::vector<double> &action_priors);
@@ -31,8 +31,8 @@ class TreeNode {
 
  private:
   // store tree
-  TreeNode *parent;
-  std::vector<TreeNode *> children;
+  TreeNode_serial *parent;
+  std::vector<TreeNode_serial *> children;
   bool is_leaf;
 
   unsigned int n_visited;
@@ -50,10 +50,10 @@ class MCTS_serial {
 
  private:
   void simulate(std::shared_ptr<Gomoku> game);
-  static void tree_deleter(TreeNode *t);
+  static void tree_deleter(TreeNode_serial *t);
 
   // variables
-  std::unique_ptr<TreeNode, decltype(MCTS_serial::tree_deleter) *> root;
+  std::unique_ptr<TreeNode_serial, decltype(MCTS_serial::tree_deleter) *> root;
   NeuralNetwork *neural_network;
 
   unsigned int action_size;

@@ -8,15 +8,15 @@
 
 using namespace std::chrono;
 
-// TreeNode
-TreeNode::TreeNode()
+// TreeNode_serial
+TreeNode_serial::TreeNode_serial()
     : parent(nullptr),
       is_leaf(true),
       n_visited(0),
       p_sa(0),
       q_sa(0) {}
 
-TreeNode::TreeNode(TreeNode *parent, double p_sa, unsigned int action_size)
+TreeNode_serial::TreeNode_serial(TreeNode_serial *parent, double p_sa, unsigned int action_size)
     : parent(parent),
       children(action_size, nullptr),
       is_leaf(true),
@@ -24,8 +24,8 @@ TreeNode::TreeNode(TreeNode *parent, double p_sa, unsigned int action_size)
       q_sa(0),
       p_sa(p_sa) {}
 
-TreeNode::TreeNode(
-    const TreeNode &node)
+TreeNode_serial::TreeNode_serial(
+    const TreeNode_serial &node)
 { // because automic<>, define copy function
   // struct
   this->parent = node.parent;
@@ -37,7 +37,7 @@ TreeNode::TreeNode(
   this->q_sa = node.q_sa;
 }
 
-TreeNode &TreeNode::operator=(const TreeNode &node)
+TreeNode_serial &TreeNode_serial::operator=(const TreeNode_serial &node)
 {
   if (this == &node)
   {
@@ -56,11 +56,11 @@ TreeNode &TreeNode::operator=(const TreeNode &node)
   return *this;
 }
 
-unsigned int TreeNode::select(double c_puct)
+unsigned int TreeNode_serial::select(double c_puct)
 {
   double best_value = -DBL_MAX;
   unsigned int best_move = 0;
-  TreeNode *best_node;
+  TreeNode_serial *best_node;
 
   for (unsigned int i = 0; i < this->children.size(); i++)
   {
@@ -84,7 +84,7 @@ unsigned int TreeNode::select(double c_puct)
   return best_move;
 }
 
-void TreeNode::expand(const std::vector<double> &action_priors)
+void TreeNode_serial::expand(const std::vector<double> &action_priors)
 {
   {
     if (this->is_leaf)
@@ -98,7 +98,7 @@ void TreeNode::expand(const std::vector<double> &action_priors)
         {
           continue;
         }
-        this->children[i] = new TreeNode(this, action_priors[i], action_size);
+        this->children[i] = new TreeNode_serial(this, action_priors[i], action_size);
       }
 
       // not leaf
@@ -107,7 +107,7 @@ void TreeNode::expand(const std::vector<double> &action_priors)
   }
 }
 
-void TreeNode::backup(double value)
+void TreeNode_serial::backup(double value)
 {
   // If it is not root, this node's parent should be updated first
   if (this->parent != nullptr)
@@ -125,7 +125,7 @@ void TreeNode::backup(double value)
   }
 }
 
-double TreeNode::get_value(double c_puct, 
+double TreeNode_serial::get_value(double c_puct, 
                            unsigned int sum_n_visited) const
 {
   // u
@@ -151,7 +151,7 @@ MCTS_serial::MCTS_serial(NeuralNetwork *neural_network, double c_puct,
       c_puct(c_puct),
       num_mcts_sims(num_mcts_sims),
       action_size(action_size),
-      root(new TreeNode(nullptr, 1., action_size), MCTS_serial::tree_deleter),
+      root(new TreeNode_serial(nullptr, 1., action_size), MCTS_serial::tree_deleter),
       selection_time(0),
       expansion_time(0),
       backprop_time(0) {}
@@ -164,7 +164,7 @@ void MCTS_serial::update_with_move(int last_action)
   if (last_action >= 0 && old_root->children[last_action] != nullptr)
   {
     // unlink
-    TreeNode *new_node = old_root->children[last_action];
+    TreeNode_serial *new_node = old_root->children[last_action];
     old_root->children[last_action] = nullptr;
     new_node->parent = nullptr;
 
@@ -172,11 +172,11 @@ void MCTS_serial::update_with_move(int last_action)
   }
   else
   {
-    this->root.reset(new TreeNode(nullptr, 1., this->action_size));
+    this->root.reset(new TreeNode_serial(nullptr, 1., this->action_size));
   }
 }
 
-void MCTS_serial::tree_deleter(TreeNode *t)
+void MCTS_serial::tree_deleter(TreeNode_serial *t)
 {
   if (t == nullptr)
   {
@@ -271,7 +271,7 @@ void MCTS_serial::simulate(std::shared_ptr<Gomoku> game)
     }
 
     // select
-    auto action = node->select(this->c_puct, this->c_virtual_loss);
+    auto action = node->select(this->c_puct);
     game->execute_move(action);
     node = node->children[action];
   }
@@ -279,7 +279,7 @@ void MCTS_serial::simulate(std::shared_ptr<Gomoku> game)
   auto end = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>(end - begin);
 
-  selection_time += duration;
+  selection_time += duration.count();
 
   // get game status
   auto status = game->get_game_status();
@@ -354,7 +354,7 @@ void MCTS_serial::simulate(std::shared_ptr<Gomoku> game)
   end = high_resolution_clock::now();
   duration = duration_cast<microseconds>(end - begin);
 
-  backprop_time += duration;
+  backprop_time += duration.count();
 
   return;
 }
