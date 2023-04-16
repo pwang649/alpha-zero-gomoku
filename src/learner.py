@@ -1,6 +1,6 @@
 from gomoku_gui import GomokuGUI
 from neural_network import NeuralNetWorkWrapper
-from library import MCTS, MCTS_serial, Gomoku, NeuralNetwork
+from library import MCTS, Gomoku, NeuralNetwork
 from collections import deque
 from os import path, mkdir
 import threading
@@ -62,7 +62,7 @@ class Leaner():
         self.nnet = NeuralNetWorkWrapper(config['lr'], config['l2'], config['num_layers'],
                                          config['num_channels'], config['n'], self.action_size, config['train_use_gpu'], self.libtorch_use_gpu)
 
-    def learn(self, serial=False):
+    def learn(self):
         # start gui
         if self.use_gui:
             t = threading.Thread(target=self.gomoku_gui.loop)
@@ -87,7 +87,7 @@ class Leaner():
             itr_examples = []
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_train_threads) as executor:
                 futures = [executor.submit(self.self_play, 1 if itr % 2 else -1,
-                                           libtorch, k == 1, serial) for k in range(1, self.num_eps + 1)]
+                                           libtorch, k == 1) for k in range(1, self.num_eps + 1)]
                 for k, f in enumerate(futures):
                     examples = f.result()
                     itr_examples += examples
@@ -136,7 +136,7 @@ class Leaner():
                 del libtorch_current
                 del libtorch_best
 
-    def self_play(self, first_color, libtorch, show, serial):
+    def self_play(self, first_color, libtorch, show):
         """
         This function executes one episode of self-play, starting with player 1.
         As the game is played, each turn is added as a training example to
@@ -150,11 +150,6 @@ class Leaner():
                        self.num_mcts_sims, self.c_virtual_loss, self.action_size)
         player2 = MCTS(libtorch, self.num_mcts_threads, self.c_puct,
                        self.num_mcts_sims, self.c_virtual_loss, self.action_size)
-        if serial:
-            player1 = MCTS_serial(libtorch, self.c_puct,
-                                  self.num_mcts_sims, self.action_size)
-            player2 = MCTS_serial(libtorch, self.c_puct,
-                                  self.num_mcts_sims, self.action_size)
         players = [player2, None, player1]
         player_index = 1
 

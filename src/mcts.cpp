@@ -12,7 +12,6 @@ using namespace std::chrono;
 TreeNode::TreeNode()
     : parent(nullptr),
       is_leaf(true),
-      virtual_loss(0),
       n_visited(0),
       p_sa(0),
       q_sa(0) {}
@@ -21,7 +20,6 @@ TreeNode::TreeNode(TreeNode *parent, double p_sa, unsigned int action_size)
     : parent(parent),
       children(action_size, nullptr),
       is_leaf(true),
-      virtual_loss(0),
       n_visited(0),
       q_sa(0),
       p_sa(p_sa) {}
@@ -34,11 +32,9 @@ TreeNode::TreeNode(
   this->children = node.children;
   this->is_leaf = node.is_leaf;
 
-  this->n_visited.store(node.n_visited.load());
+  this->n_visited = node.n_visited;
   this->p_sa = node.p_sa;
   this->q_sa = node.q_sa;
-
-  this->virtual_loss.store(node.virtual_loss.load());
 }
 
 TreeNode &TreeNode::operator=(const TreeNode &node)
@@ -53,15 +49,14 @@ TreeNode &TreeNode::operator=(const TreeNode &node)
   this->children = node.children;
   this->is_leaf = node.is_leaf;
 
-  this->n_visited.store(node.n_visited.load());
+  this->n_visited = node.n_visited;
   this->p_sa = node.p_sa;
   this->q_sa = node.q_sa;
-  this->virtual_loss.store(node.virtual_loss.load());
 
   return *this;
 }
 
-unsigned int TreeNode::select(double c_puct, double c_virtual_loss)
+unsigned int TreeNode::select(double c_puct)
 {
   double best_value = -DBL_MAX;
   unsigned int best_move = 0;
@@ -75,9 +70,9 @@ unsigned int TreeNode::select(double c_puct, double c_virtual_loss)
       continue;
     }
 
-    unsigned int sum_n_visited = this->n_visited.load() + 1;
+    unsigned int sum_n_visited = this->n_visited + 1;
     double cur_value =
-        children[i]->get_value(c_puct, c_virtual_loss, sum_n_visited);
+        children[i]->get_value(c_puct, sum_n_visited);
     if (cur_value > best_value)
     {
       best_value = cur_value;
@@ -86,18 +81,12 @@ unsigned int TreeNode::select(double c_puct, double c_virtual_loss)
     }
   }
 
-  // add vitural loss
-  best_node->virtual_loss++;
-
   return best_move;
 }
 
 void TreeNode::expand(const std::vector<double> &action_priors)
 {
   {
-    // get lock
-    std::lock_guard<std::mutex> lock(this->lock);
-
     if (this->is_leaf)
     {
       unsigned int action_size = this->children.size();
@@ -126,30 +115,23 @@ void TreeNode::backup(double value)
     this->parent->backup(-value);
   }
 
-  // remove vitural loss
-  this->virtual_loss--;
-
   // update n_visited
-  unsigned int n_visited = this->n_visited.load();
+  unsigned int n_visited = this->n_visited;
   this->n_visited++;
 
   // update q_sa
   {
-    std::lock_guard<std::mutex> lock(this->lock);
     this->q_sa = (n_visited * this->q_sa + value) / (n_visited + 1);
   }
 }
 
-double TreeNode::get_value(double c_puct, double c_virtual_loss,
+double TreeNode::get_value(double c_puct, 
                            unsigned int sum_n_visited) const
 {
   // u
-  auto n_visited = this->n_visited.load();
+  auto n_visited = this->n_visited;
   double u = (c_puct * this->p_sa * sqrt(sum_n_visited) / (1 + n_visited));
 
-  // virtual loss
-  double virtual_loss = c_virtual_loss * this->virtual_loss.load();
-  // int n_visited_with_loss = n_visited - virtual_loss;
 
   if (n_visited <= 0)
   {
@@ -157,19 +139,17 @@ double TreeNode::get_value(double c_puct, double c_virtual_loss,
   }
   else
   {
-    return u + (this->q_sa * n_visited - virtual_loss) / n_visited;
+    return u + this->q_sa;
   }
 }
 
 // MCTS
-MCTS::MCTS(NeuralNetwork *neural_network, unsigned int thread_num, double c_puct,
-           unsigned int num_mcts_sims, double c_virtual_loss,
+MCTS::MCTS(NeuralNetwork *neural_network, double c_puct,
+           unsigned int num_mcts_sims,
            unsigned int action_size)
     : neural_network(neural_network),
-      thread_pool(new ThreadPool(thread_num)),
       c_puct(c_puct),
       num_mcts_sims(num_mcts_sims),
-      c_virtual_loss(c_virtual_loss),
       action_size(action_size),
       root(new TreeNode(nullptr, 1., action_size), MCTS::tree_deleter),
       selection_time(0),
@@ -218,32 +198,19 @@ void MCTS::tree_deleter(TreeNode *t)
 
 std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp)
 {
-  // submit simulate tasks to thread_pool
-  std::vector<std::future<void>> futures;
-
   auto begin = high_resolution_clock::now();
 
   for (unsigned int i = 0; i < this->num_mcts_sims; i++)
   {
     // copy gomoku
     auto game = std::make_shared<Gomoku>(*gomoku);
-    auto future =
-        this->thread_pool->commit(std::bind(&MCTS::simulate, this, game));
-
-    // future can't copy
-    futures.emplace_back(std::move(future));
-  }
-
-  // wait simulate
-  for (unsigned int i = 0; i < futures.size(); i++)
-  {
-    futures[i].wait();
+    simulate(game);
   }
 
   auto end = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>(end - begin);
 
-  std::cout << "Elapsed Time for an Entire Parallel Run: " << duration.count() << " ms.";
+  std::cout << "Elapsed Time for an Entire Serial Run: " << duration.count() << " ms.";
 
   // calculate probs
   std::vector<double> action_probs(gomoku->get_action_size(), 0);
@@ -257,9 +224,9 @@ std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp)
 
     for (unsigned int i = 0; i < children.size(); i++)
     {
-      if (children[i] && children[i]->n_visited.load() > max_count)
+      if (children[i] && children[i]->n_visited > max_count)
       {
-        max_count = children[i]->n_visited.load();
+        max_count = children[i]->n_visited;
         best_action = i;
       }
     }
@@ -273,9 +240,9 @@ std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp)
     double sum = 0;
     for (unsigned int i = 0; i < children.size(); i++)
     {
-      if (children[i] && children[i]->n_visited.load() > 0)
+      if (children[i] && children[i]->n_visited > 0)
       {
-        action_probs[i] = pow(children[i]->n_visited.load(), 1 / temp);
+        action_probs[i] = pow(children[i]->n_visited, 1 / temp);
         sum += action_probs[i];
       }
     }
@@ -304,7 +271,7 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
     }
 
     // select
-    auto action = node->select(this->c_puct, this->c_virtual_loss);
+    auto action = node->select(this->c_puct);
     game->execute_move(action);
     node = node->children[action];
   }

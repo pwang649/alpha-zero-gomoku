@@ -21,11 +21,11 @@ class TreeNode {
 
   TreeNode &operator=(const TreeNode &p);
 
-  unsigned int select(double c_puct, double c_virtual_loss);
+  unsigned int select(double c_puct);
   void expand(const std::vector<double> &action_priors);
   void backup(double leaf_value);
 
-  double get_value(double c_puct, double c_virtual_loss,
+  double get_value(double c_puct,
                    unsigned int sum_n_visited) const;
   inline bool get_is_leaf() const { return this->is_leaf; }
 
@@ -34,18 +34,16 @@ class TreeNode {
   TreeNode *parent;
   std::vector<TreeNode *> children;
   bool is_leaf;
-  std::mutex lock;
 
-  std::atomic<unsigned int> n_visited;
+  unsigned int n_visited;
   double p_sa;
   double q_sa;
-  std::atomic<int> virtual_loss;
 };
 
 class MCTS {
  public:
-  MCTS(NeuralNetwork *neural_network, unsigned int thread_num, double c_puct,
-       unsigned int num_mcts_sims, double c_virtual_loss,
+  MCTS(NeuralNetwork *neural_network, double c_puct,
+       unsigned int num_mcts_sims,
        unsigned int action_size);
   std::vector<double> get_action_probs(Gomoku *gomoku, double temp = 1e-3);
   void update_with_move(int last_move);
@@ -56,14 +54,12 @@ class MCTS {
 
   // variables
   std::unique_ptr<TreeNode, decltype(MCTS::tree_deleter) *> root;
-  std::unique_ptr<ThreadPool> thread_pool;
   NeuralNetwork *neural_network;
 
   unsigned int action_size;
   unsigned int num_mcts_sims;
   double c_puct;
-  double c_virtual_loss;
-  std::atomic<int> selection_time;
-  std::atomic<int> expansion_time;
-  std::atomic<int> backprop_time;
+  int selection_time;
+  int expansion_time;
+  int backprop_time;
 };
