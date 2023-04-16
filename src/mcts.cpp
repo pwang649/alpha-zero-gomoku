@@ -210,7 +210,7 @@ std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp)
   auto end = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>(end - begin);
 
-  std::cout << "Elapsed Time for an Entire Serial Run: " << duration.count() << " ms.";
+  std::cout << "Time for one Run: " << duration.count() << " ns." << std::endl;
 
   // calculate probs
   std::vector<double> action_probs(gomoku->get_action_size(), 0);
