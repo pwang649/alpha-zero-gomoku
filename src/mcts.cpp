@@ -332,7 +332,7 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game) {
         node->expand(action_priors);
         node->backup(-value);
 
-        auto future = this->thread_pool->commit(std::bind(&this->neural_network->commit, this, game.get()));
+        auto future = this->thread_pool->commit(std::bind(&NeuralNetwork::commit, this->neural_network, game.get()));
         futures[j] = std::move(future);
       }
     }
