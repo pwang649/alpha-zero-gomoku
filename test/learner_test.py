@@ -14,10 +14,8 @@ if __name__ == "__main__":
     alpha_zero = learner.Leaner(config.config)
 
     if sys.argv[1] == "train":
-        alpha_zero.learn(serial=False)
+        alpha_zero.learn()
     elif sys.argv[1] == "play":
         for i in range(10):
             print("GAME: {}".format(i + 1))
             alpha_zero.play_with_human(human_first=i % 2)
-    elif sys.argv[1] == "serial":
-        alpha_zero.learn(serial=True)

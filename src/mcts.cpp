@@ -1,12 +1,9 @@
 #include <math.h>
 #include <float.h>
-#include <chrono>
 #include <numeric>
 #include <iostream>
 
 #include <mcts.h>
-
-using namespace std::chrono;
 
 // TreeNode
 TreeNode::TreeNode()
@@ -27,8 +24,7 @@ TreeNode::TreeNode(TreeNode *parent, double p_sa, unsigned int action_size)
       p_sa(p_sa) {}
 
 TreeNode::TreeNode(
-    const TreeNode &node)
-{ // because automic<>, define copy function
+    const TreeNode &node) {  // because automic<>, define copy function
   // struct
   this->parent = node.parent;
   this->children = node.children;
@@ -41,10 +37,8 @@ TreeNode::TreeNode(
   this->virtual_loss.store(node.virtual_loss.load());
 }
 
-TreeNode &TreeNode::operator=(const TreeNode &node)
-{
-  if (this == &node)
-  {
+TreeNode &TreeNode::operator=(const TreeNode &node) {
+  if (this == &node) {
     return *this;
   }
 
@@ -61,25 +55,21 @@ TreeNode &TreeNode::operator=(const TreeNode &node)
   return *this;
 }
 
-unsigned int TreeNode::select(double c_puct, double c_virtual_loss)
-{
+unsigned int TreeNode::select(double c_puct, double c_virtual_loss) {
   double best_value = -DBL_MAX;
   unsigned int best_move = 0;
   TreeNode *best_node;
 
-  for (unsigned int i = 0; i < this->children.size(); i++)
-  {
+  for (unsigned int i = 0; i < this->children.size(); i++) {
     // empty node
-    if (children[i] == nullptr)
-    {
+    if (children[i] == nullptr) {
       continue;
     }
 
     unsigned int sum_n_visited = this->n_visited.load() + 1;
     double cur_value =
         children[i]->get_value(c_puct, c_virtual_loss, sum_n_visited);
-    if (cur_value > best_value)
-    {
+    if (cur_value > best_value) {
       best_value = cur_value;
       best_move = i;
       best_node = children[i];
@@ -92,21 +82,17 @@ unsigned int TreeNode::select(double c_puct, double c_virtual_loss)
   return best_move;
 }
 
-void TreeNode::expand(const std::vector<double> &action_priors)
-{
+void TreeNode::expand(const std::vector<double> &action_priors) {
   {
     // get lock
     std::lock_guard<std::mutex> lock(this->lock);
 
-    if (this->is_leaf)
-    {
+    if (this->is_leaf) {
       unsigned int action_size = this->children.size();
 
-      for (unsigned int i = 0; i < action_size; i++)
-      {
+      for (unsigned int i = 0; i < action_size; i++) {
         // illegal action
-        if (abs(action_priors[i] - 0) < FLT_EPSILON)
-        {
+        if (abs(action_priors[i] - 0) < FLT_EPSILON) {
           continue;
         }
         this->children[i] = new TreeNode(this, action_priors[i], action_size);
@@ -118,11 +104,9 @@ void TreeNode::expand(const std::vector<double> &action_priors)
   }
 }
 
-void TreeNode::backup(double value)
-{
+void TreeNode::backup(double value) {
   // If it is not root, this node's parent should be updated first
-  if (this->parent != nullptr)
-  {
+  if (this->parent != nullptr) {
     this->parent->backup(-value);
   }
 
@@ -141,8 +125,7 @@ void TreeNode::backup(double value)
 }
 
 double TreeNode::get_value(double c_puct, double c_virtual_loss,
-                           unsigned int sum_n_visited) const
-{
+                           unsigned int sum_n_visited) const {
   // u
   auto n_visited = this->n_visited.load();
   double u = (c_puct * this->p_sa * sqrt(sum_n_visited) / (1 + n_visited));
@@ -151,12 +134,9 @@ double TreeNode::get_value(double c_puct, double c_virtual_loss,
   double virtual_loss = c_virtual_loss * this->virtual_loss.load();
   // int n_visited_with_loss = n_visited - virtual_loss;
 
-  if (n_visited <= 0)
-  {
+  if (n_visited <= 0) {
     return u;
-  }
-  else
-  {
+  } else {
     return u + (this->q_sa * n_visited - virtual_loss) / n_visited;
   }
 }
@@ -171,43 +151,32 @@ MCTS::MCTS(NeuralNetwork *neural_network, unsigned int thread_num, double c_puct
       num_mcts_sims(num_mcts_sims),
       c_virtual_loss(c_virtual_loss),
       action_size(action_size),
-      root(new TreeNode(nullptr, 1., action_size), MCTS::tree_deleter),
-      selection_time(0),
-      expansion_time(0),
-      backprop_time(0) {}
+      root(new TreeNode(nullptr, 1., action_size), MCTS::tree_deleter){}
 
-void MCTS::update_with_move(int last_action)
-{
+void MCTS::update_with_move(int last_action) {
   auto old_root = this->root.get();
 
   // reuse the child tree
-  if (last_action >= 0 && old_root->children[last_action] != nullptr)
-  {
+  if (last_action >= 0 && old_root->children[last_action] != nullptr) {
     // unlink
     TreeNode *new_node = old_root->children[last_action];
     old_root->children[last_action] = nullptr;
     new_node->parent = nullptr;
 
     this->root.reset(new_node);
-  }
-  else
-  {
+  } else {
     this->root.reset(new TreeNode(nullptr, 1., this->action_size));
   }
 }
 
-void MCTS::tree_deleter(TreeNode *t)
-{
-  if (t == nullptr)
-  {
+void MCTS::tree_deleter(TreeNode *t) {
+  if (t == nullptr) {
     return;
   }
 
   // remove children
-  for (unsigned int i = 0; i < t->children.size(); i++)
-  {
-    if (t->children[i])
-    {
+  for (unsigned int i = 0; i < t->children.size(); i++) {
+    if (t->children[i]) {
       tree_deleter(t->children[i]);
     }
   }
@@ -216,15 +185,11 @@ void MCTS::tree_deleter(TreeNode *t)
   delete t;
 }
 
-std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp)
-{
+std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp) {
   // submit simulate tasks to thread_pool
   std::vector<std::future<void>> futures;
 
-  auto begin = high_resolution_clock::now();
-
-  for (unsigned int i = 0; i < this->num_mcts_sims; i++)
-  {
+  for (unsigned int i = 0; i < this->num_mcts_sims; i++) {
     // copy gomoku
     auto game = std::make_shared<Gomoku>(*gomoku);
     auto future =
@@ -235,30 +200,21 @@ std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp)
   }
 
   // wait simulate
-  for (unsigned int i = 0; i < futures.size(); i++)
-  {
+  for (unsigned int i = 0; i < futures.size(); i++) {
     futures[i].wait();
   }
-
-  auto end = high_resolution_clock::now();
-  auto duration = duration_cast<microseconds>(end - begin);
-
-  std::cout << "Elapsed Time for an Entire Parallel Run: " << duration.count() << " ms.";
 
   // calculate probs
   std::vector<double> action_probs(gomoku->get_action_size(), 0);
   const auto &children = this->root->children;
 
   // greedy
-  if (temp - 1e-3 < FLT_EPSILON)
-  {
+  if (temp - 1e-3 < FLT_EPSILON) {
     unsigned int max_count = 0;
     unsigned int best_action = 0;
 
-    for (unsigned int i = 0; i < children.size(); i++)
-    {
-      if (children[i] && children[i]->n_visited.load() > max_count)
-      {
+    for (unsigned int i = 0; i < children.size(); i++) {
+      if (children[i] && children[i]->n_visited.load() > max_count) {
         max_count = children[i]->n_visited.load();
         best_action = i;
       }
@@ -266,15 +222,12 @@ std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp)
 
     action_probs[best_action] = 1.;
     return action_probs;
-  }
-  else
-  {
+
+  } else {
     // explore
     double sum = 0;
-    for (unsigned int i = 0; i < children.size(); i++)
-    {
-      if (children[i] && children[i]->n_visited.load() > 0)
-      {
+    for (unsigned int i = 0; i < children.size(); i++) {
+      if (children[i] && children[i]->n_visited.load() > 0) {
         action_probs[i] = pow(children[i]->n_visited.load(), 1 / temp);
         sum += action_probs[i];
       }
@@ -282,24 +235,18 @@ std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp)
 
     // renormalization
     std::for_each(action_probs.begin(), action_probs.end(),
-                  [sum](double &x)
-                  { x /= sum; });
+                  [sum](double &x) { x /= sum; });
 
     return action_probs;
   }
 }
 
-void MCTS::simulate(std::shared_ptr<Gomoku> game)
-{
+void MCTS::simulate(std::shared_ptr<Gomoku> game) {
   // execute one simulation
   auto node = this->root.get();
 
-  auto begin = high_resolution_clock::now();
-
-  while (true)
-  {
-    if (node->get_is_leaf())
-    {
+  while (true) {
+    if (node->get_is_leaf()) {
       break;
     }
 
@@ -309,18 +256,12 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
     node = node->children[action];
   }
 
-  auto end = high_resolution_clock::now();
-  auto duration = duration_cast<microseconds>(end - begin);
-
-  selection_time += duration.count();
-
   // get game status
   auto status = game->get_game_status();
   double value = 0;
 
   // not end
-  if (status[0] == 0)
-  {
+  if (status[0] == 0) {
     // predict action_probs and value by neural network
     std::vector<double> action_priors(this->action_size, 0);
 
@@ -333,27 +274,19 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
     // mask invalid actions
     auto legal_moves = game->get_legal_moves();
     double sum = 0;
-    for (unsigned int i = 0; i < action_priors.size(); i++)
-    {
-      if (legal_moves[i] == 1)
-      {
+    for (unsigned int i = 0; i < action_priors.size(); i++) {
+      if (legal_moves[i] == 1) {
         sum += action_priors[i];
-      }
-      else
-      {
+      } else {
         action_priors[i] = 0;
       }
     }
 
     // renormalization
-    if (sum > FLT_EPSILON)
-    {
+    if (sum > FLT_EPSILON) {
       std::for_each(action_priors.begin(), action_priors.end(),
-                    [sum](double &x)
-                    { x /= sum; });
-    }
-    else
-    {
+                    [sum](double &x) { x /= sum; });
+    } else {
       // all masked
 
       // NB! All valid moves may be masked if either your NNet architecture is
@@ -363,31 +296,21 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
       std::cout << "All valid moves were masked, do workaround." << std::endl;
 
       sum = std::accumulate(legal_moves.begin(), legal_moves.end(), 0);
-      for (unsigned int i = 0; i < action_priors.size(); i++)
-      {
+      for (unsigned int i = 0; i < action_priors.size(); i++) {
         action_priors[i] = legal_moves[i] / sum;
       }
     }
 
     // expand
     node->expand(action_priors);
-  }
-  else
-  {
+
+  } else {
     // end
     auto winner = status[1];
     value = (winner == 0 ? 0 : (winner == game->get_current_color() ? 1 : -1));
   }
 
-  begin = high_resolution_clock::now();
-
   // value(parent -> node) = -value
   node->backup(-value);
-
-  end = high_resolution_clock::now();
-  duration = duration_cast<microseconds>(end - begin);
-
-  backprop_time += duration.count();
-
   return;
 }
