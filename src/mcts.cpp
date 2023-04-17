@@ -187,22 +187,25 @@ void MCTS::tree_deleter(TreeNode *t) {
 
 std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp) {
   // submit simulate tasks to thread_pool
-  std::vector<std::future<void>> futures;
+  // std::vector<std::future<void>> futures;
 
-  for (unsigned int i = 0; i < this->num_mcts_sims; i++) {
-    // copy gomoku
-    auto game = std::make_shared<Gomoku>(*gomoku);
-    auto future =
-        this->thread_pool->commit(std::bind(&MCTS::simulate, this, game));
+  // for (unsigned int i = 0; i < this->num_mcts_sims; i++) {
+  //   // copy gomoku
+  //   auto game = std::make_shared<Gomoku>(*gomoku);
+  //   auto future =
+  //       this->thread_pool->commit(std::bind(&MCTS::simulate, this, game));
 
-    // future can't copy
-    futures.emplace_back(std::move(future));
-  }
+  //   // future can't copy
+  //   futures.emplace_back(std::move(future));
+  // }
 
-  // wait simulate
-  for (unsigned int i = 0; i < futures.size(); i++) {
-    futures[i].wait();
-  }
+  // // wait simulate
+  // for (unsigned int i = 0; i < futures.size(); i++) {
+  //   futures[i].wait();
+  // }
+
+  auto game = std::make_shared<Gomoku>(*gomoku);
+  simulate(game);
 
   // calculate probs
   std::vector<double> action_probs(gomoku->get_action_size(), 0);
@@ -243,74 +246,167 @@ std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp) {
 
 void MCTS::simulate(std::shared_ptr<Gomoku> game) {
   // execute one simulation
-  auto node = this->root.get();
 
-  while (true) {
-    if (node->get_is_leaf()) {
-      break;
+  std::vector<std::future<void>> futures(this->thread_pool->get_idl_num());
+  int occupied = 0;
+
+  for (unsigned int i = 0; i < this->num_mcts_sims; i++) {
+    auto node = this->root.get();
+
+    while (true) {
+      if (node->get_is_leaf()) {
+        break;
+      }
+
+      // select
+      auto action = node->select(this->c_puct, this->c_virtual_loss);
+      game->execute_move(action);
+      node = node->children[action];
     }
 
-    // select
-    auto action = node->select(this->c_puct, this->c_virtual_loss);
-    game->execute_move(action);
-    node = node->children[action];
+    auto status = game->get_game_status();
+    double value = 0;
+
+    // end state
+    if (status[0] != 0) {
+      auto winner = status[1];
+      value = (winner == 0 ? 0 : (winner == game->get_current_color() ? 1 : -1));
+      node->backup(-value);
+      continue;
+    }
+    else {
+      if (occupied < futures.size()) {
+        auto future = this->thread_pool->commit(std::bind(&this->neural_network->commit, this, game.get()));
+        futures[occupied] = std::move(future);
+        occupied++;
+      }
+      else {
+        unsigned int j = 0;
+        while (true) {
+          for (j = 0; j < futures.size(); j++) {
+            if (futures[j].wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+              break;
+            }
+          }
+          if (j < futures.size()) {
+            break;
+          }
+        }
+
+        std::vector<double> action_priors(this->action_size, 0);
+        auto result = futures[j].get();
+
+        action_priors = std::move(result[0]);
+        value = result[1][0];
+
+        // mask invalid actions
+        auto legal_moves = game->get_legal_moves();
+        double sum = 0;
+        for (unsigned int i = 0; i < action_priors.size(); i++) {
+          if (legal_moves[i] == 1) {
+            sum += action_priors[i];
+          } else {
+            action_priors[i] = 0;
+          }
+        }
+
+        // renormalization
+        if (sum > FLT_EPSILON) {
+          std::for_each(action_priors.begin(), action_priors.end(),
+                        [sum](double &x) { x /= sum; });
+        } else {
+          // all masked
+
+          // NB! All valid moves may be masked if either your NNet architecture is
+          // insufficient or you've get overfitting or something else. If you have
+          // got dozens or hundreds of these messages you should pay attention to
+          // your NNet and/or training process.
+          std::cout << "All valid moves were masked, do workaround." << std::endl;
+
+          sum = std::accumulate(legal_moves.begin(), legal_moves.end(), 0);
+          for (unsigned int i = 0; i < action_priors.size(); i++) {
+            action_priors[i] = legal_moves[i] / sum;
+          }
+        }
+        
+        node->expand(action_priors);
+        node->backup(-value);
+
+        auto future = this->thread_pool->commit(std::bind(&this->neural_network->commit, this, game.get()));
+        futures[j] = std::move(future);
+      }
+    }
   }
+  return;
+
+  // auto node = this->root.get();
+
+  // while (true) {
+  //   if (node->get_is_leaf()) {
+  //     break;
+  //   }
+
+  //   // select
+  //   auto action = node->select(this->c_puct, this->c_virtual_loss);
+  //   game->execute_move(action);
+  //   node = node->children[action];
+  // }
 
   // get game status
-  auto status = game->get_game_status();
-  double value = 0;
+  // auto status = game->get_game_status();
+  // double value = 0;
 
-  // not end
-  if (status[0] == 0) {
-    // predict action_probs and value by neural network
-    std::vector<double> action_priors(this->action_size, 0);
+  // // not end
+  // if (status[0] == 0) {
+  //   // predict action_probs and value by neural network
+  //   std::vector<double> action_priors(this->action_size, 0);
 
-    auto future = this->neural_network->commit(game.get());
-    auto result = future.get();
+  //   auto future = this->neural_network->commit(game.get());
+  //   auto result = future.get();
 
-    action_priors = std::move(result[0]);
-    value = result[1][0];
+  //   action_priors = std::move(result[0]);
+  //   value = result[1][0];
 
-    // mask invalid actions
-    auto legal_moves = game->get_legal_moves();
-    double sum = 0;
-    for (unsigned int i = 0; i < action_priors.size(); i++) {
-      if (legal_moves[i] == 1) {
-        sum += action_priors[i];
-      } else {
-        action_priors[i] = 0;
-      }
-    }
+  //   // mask invalid actions
+  //   auto legal_moves = game->get_legal_moves();
+  //   double sum = 0;
+  //   for (unsigned int i = 0; i < action_priors.size(); i++) {
+  //     if (legal_moves[i] == 1) {
+  //       sum += action_priors[i];
+  //     } else {
+  //       action_priors[i] = 0;
+  //     }
+  //   }
 
-    // renormalization
-    if (sum > FLT_EPSILON) {
-      std::for_each(action_priors.begin(), action_priors.end(),
-                    [sum](double &x) { x /= sum; });
-    } else {
-      // all masked
+  //   // renormalization
+  //   if (sum > FLT_EPSILON) {
+  //     std::for_each(action_priors.begin(), action_priors.end(),
+  //                   [sum](double &x) { x /= sum; });
+  //   } else {
+  //     // all masked
 
-      // NB! All valid moves may be masked if either your NNet architecture is
-      // insufficient or you've get overfitting or something else. If you have
-      // got dozens or hundreds of these messages you should pay attention to
-      // your NNet and/or training process.
-      std::cout << "All valid moves were masked, do workaround." << std::endl;
+  //     // NB! All valid moves may be masked if either your NNet architecture is
+  //     // insufficient or you've get overfitting or something else. If you have
+  //     // got dozens or hundreds of these messages you should pay attention to
+  //     // your NNet and/or training process.
+  //     std::cout << "All valid moves were masked, do workaround." << std::endl;
 
-      sum = std::accumulate(legal_moves.begin(), legal_moves.end(), 0);
-      for (unsigned int i = 0; i < action_priors.size(); i++) {
-        action_priors[i] = legal_moves[i] / sum;
-      }
-    }
+  //     sum = std::accumulate(legal_moves.begin(), legal_moves.end(), 0);
+  //     for (unsigned int i = 0; i < action_priors.size(); i++) {
+  //       action_priors[i] = legal_moves[i] / sum;
+  //     }
+  //   }
 
-    // expand
-    node->expand(action_priors);
+  //   // expand
+  //   node->expand(action_priors);
 
-  } else {
-    // end
-    auto winner = status[1];
-    value = (winner == 0 ? 0 : (winner == game->get_current_color() ? 1 : -1));
-  }
+  // } else {
+  //   // end
+  //   auto winner = status[1];
+  //   value = (winner == 0 ? 0 : (winner == game->get_current_color() ? 1 : -1));
+  // }
 
-  // value(parent -> node) = -value
-  node->backup(-value);
-  return;
+  // // value(parent -> node) = -value
+  // node->backup(-value);
+  // return;
 }
