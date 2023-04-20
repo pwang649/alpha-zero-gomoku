@@ -297,9 +297,10 @@ std::pair<TreeNode*, double> MCTS::exc_sim(TreeNode* node, std::shared_ptr<Gomok
 
 void MCTS::simulate(std::shared_ptr<Gomoku> game) {
 
-  std::vector<std::future<void>> futures(this->thread_pool->get_idl_num());
+  std::vector<std::future<std::pair<TreeNode*, double>> futures(this->thread_pool->get_idl_num());
   int occupied = 0;
   int completed = 0;
+  int available = 0;
 
   while (completed < this->num_mcts_sims) {
     auto node = this->root.get();
@@ -329,8 +330,9 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game) {
       // if (occupied < futures.size()) {
       auto future = this->thread_pool->commit(std::bind(&MCTS::exc_sim, this, node, game));
       // auto future = this->thread_pool->commit(std::bind(&NeuralNetwork::commit, this->neural_network, game.get()));
-      futures[occupied] = std::move(future);
+      futures[available] = std::move(future);
       occupied++;
+      available++;
       // }
       if (occupied >= futures.size()) {
         // wait for one thread to finish
@@ -342,6 +344,7 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game) {
               result[0]->backup(-result[1]);
               completed++;
               occupied--;
+              available = j;
               break;
             }
           }
