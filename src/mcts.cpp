@@ -244,8 +244,58 @@ std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp) {
   }
 }
 
+template<typename R>
+bool future_is_ready(std::future<R> const& f)
+{
+  return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready; 
+}
+
+std::pair<TreeNode*, double> void MCTS::exc_sim(TreeNode* node, Gomoku game) {
+  std::vector<double> action_priors(this->action_size, 0);
+
+  auto future = this->neural_network->commit(game.get());
+  auto result = future.get();
+
+  action_priors = std::move(result[0]);
+  auto value = result[1][0];
+
+  // mask invalid actions
+  auto legal_moves = game->get_legal_moves();
+  double sum = 0;
+  for (unsigned int i = 0; i < action_priors.size(); i++) {
+    if (legal_moves[i] == 1) {
+      sum += action_priors[i];
+    } else {
+      action_priors[i] = 0;
+    }
+  }
+
+  // renormalization
+  if (sum > FLT_EPSILON) {
+    std::for_each(action_priors.begin(), action_priors.end(),
+                  [sum](double &x) { x /= sum; });
+  } else {
+    // all masked
+
+    // NB! All valid moves may be masked if either your NNet architecture is
+    // insufficient or you've get overfitting or something else. If you have
+    // got dozens or hundreds of these messages you should pay attention to
+    // your NNet and/or training process.
+    std::cout << "All valid moves were masked, do workaround." << std::endl;
+
+    sum = std::accumulate(legal_moves.begin(), legal_moves.end(), 0);
+    for (unsigned int i = 0; i < action_priors.size(); i++) {
+      action_priors[i] = legal_moves[i] / sum;
+    }
+  }
+
+  // expand
+  node->expand(action_priors);
+
+  return {node, value};
+}
+
 void MCTS::simulate(std::shared_ptr<Gomoku> game) {
-  // execute one simulation
 
   std::vector<std::future<void>> futures(this->thread_pool->get_idl_num());
   int occupied = 0;
@@ -276,15 +326,19 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game) {
     }
     else {
       if (occupied < futures.size()) {
-        auto future = this->thread_pool->commit(std::bind(&this->neural_network->commit, this, game.get()));
+        auto future = this->thread_pool->commit(std::bind(&exc_sim, this, game.get()));
+        // auto future = this->thread_pool->commit(std::bind(&NeuralNetwork::commit, this->neural_network, game.get()));
         futures[occupied] = std::move(future);
         occupied++;
       }
       else {
+        // wait for one thread to finish
         unsigned int j = 0;
         while (true) {
           for (j = 0; j < futures.size(); j++) {
-            if (futures[j].wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+            if (future_is_ready(futures[j])) {
+              auto result = futures[j].get();
+              result[0]->backup(-result[1]);
               break;
             }
           }
@@ -293,46 +347,7 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game) {
           }
         }
 
-        std::vector<double> action_priors(this->action_size, 0);
-        auto result = futures[j].get();
-
-        action_priors = std::move(result[0]);
-        value = result[1][0];
-
-        // mask invalid actions
-        auto legal_moves = game->get_legal_moves();
-        double sum = 0;
-        for (unsigned int i = 0; i < action_priors.size(); i++) {
-          if (legal_moves[i] == 1) {
-            sum += action_priors[i];
-          } else {
-            action_priors[i] = 0;
-          }
-        }
-
-        // renormalization
-        if (sum > FLT_EPSILON) {
-          std::for_each(action_priors.begin(), action_priors.end(),
-                        [sum](double &x) { x /= sum; });
-        } else {
-          // all masked
-
-          // NB! All valid moves may be masked if either your NNet architecture is
-          // insufficient or you've get overfitting or something else. If you have
-          // got dozens or hundreds of these messages you should pay attention to
-          // your NNet and/or training process.
-          std::cout << "All valid moves were masked, do workaround." << std::endl;
-
-          sum = std::accumulate(legal_moves.begin(), legal_moves.end(), 0);
-          for (unsigned int i = 0; i < action_priors.size(); i++) {
-            action_priors[i] = legal_moves[i] / sum;
-          }
-        }
-        
-        node->expand(action_priors);
-        node->backup(-value);
-
-        auto future = this->thread_pool->commit(std::bind(&NeuralNetwork::commit, this->neural_network, game.get()));
+        auto future = this->thread_pool->commit(std::bind(&exc_sim, this, game.get()));
         futures[j] = std::move(future);
       }
     }
