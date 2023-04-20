@@ -326,13 +326,13 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game) {
       continue;
     }
     else {
-      if (occupied < futures.size()) {
-        auto future = this->thread_pool->commit(std::bind(&exc_sim, this, node, game.get()));
-        // auto future = this->thread_pool->commit(std::bind(&NeuralNetwork::commit, this->neural_network, game.get()));
-        futures[occupied] = std::move(future);
-        occupied++;
-      }
-      else {
+      // if (occupied < futures.size()) {
+      auto future = this->thread_pool->commit(std::bind(&exc_sim, this, node, game.get()));
+      // auto future = this->thread_pool->commit(std::bind(&NeuralNetwork::commit, this->neural_network, game.get()));
+      futures[occupied] = std::move(future);
+      occupied++;
+      // }
+      if (occupied >= futures.size()) {
         // wait for one thread to finish
         unsigned int j = 0;
         while (true) {
