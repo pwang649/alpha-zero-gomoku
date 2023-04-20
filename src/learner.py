@@ -81,6 +81,7 @@ class Leaner():
             print("ITER :: {}".format(itr))
 
             # self play in parallel
+            start_self_play_time = time.time()
             libtorch = NeuralNetwork('./models/checkpoint.pt',
                                      self.libtorch_use_gpu, self.num_mcts_threads * self.num_train_threads)
             itr_examples = []
@@ -98,7 +99,10 @@ class Leaner():
             # release gpu memory
             del libtorch
 
+            print("Self play time: {}".format(time.time() - start_self_play_time))
+
             # prepare train data
+            start_train_time = time.time()
             self.examples_buffer.append(itr_examples)
             train_data = reduce(lambda a, b : a + b, self.examples_buffer)
             random.shuffle(train_data)
@@ -108,6 +112,8 @@ class Leaner():
             self.nnet.train(train_data, self.batch_size, int(epochs))
             self.nnet.save_model()
             self.save_samples()
+
+            print("Training time: {}".format(time.time() - start_train_time))
 
             # compare performance
             if itr % self.check_freq == 0:
