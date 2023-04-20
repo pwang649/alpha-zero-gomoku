@@ -24,7 +24,6 @@ class TreeNode {
   unsigned int select(double c_puct, double c_virtual_loss);
   void expand(const std::vector<double> &action_priors);
   void backup(double leaf_value);
-  std::pair<TreeNode*, double> exc_sim(TreeNode* node, Gomoku game);
 
   double get_value(double c_puct, double c_virtual_loss,
                    unsigned int sum_n_visited) const;
@@ -54,6 +53,7 @@ class MCTS {
  private:
   void simulate(std::shared_ptr<Gomoku> game);
   static void tree_deleter(TreeNode *t);
+  std::pair<TreeNode*, double> exc_sim(TreeNode* node, std::shared_ptr<Gomoku> game);
 
   // variables
   std::unique_ptr<TreeNode, decltype(MCTS::tree_deleter) *> root;

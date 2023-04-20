@@ -250,14 +250,14 @@ bool future_is_ready(std::future<R> const& f)
   return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready; 
 }
 
-std::pair<TreeNode*, double> void MCTS::exc_sim(TreeNode* node, Gomoku game) {
+std::pair<TreeNode*, double> MCTS::exc_sim(TreeNode* node, std::shared_ptr<Gomoku> game) {
   std::vector<double> action_priors(this->action_size, 0);
 
   auto future = this->neural_network->commit(game.get());
   auto result = future.get();
 
   action_priors = std::move(result[0]);
-  auto value = result[1][0];
+  double value = result[1][0];
 
   // mask invalid actions
   auto legal_moves = game->get_legal_moves();
@@ -292,7 +292,7 @@ std::pair<TreeNode*, double> void MCTS::exc_sim(TreeNode* node, Gomoku game) {
   // expand
   node->expand(action_priors);
 
-  return {node, value};
+  return std::make_pair(node, value);
 }
 
 void MCTS::simulate(std::shared_ptr<Gomoku> game) {
@@ -327,7 +327,7 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game) {
     }
     else {
       // if (occupied < futures.size()) {
-      auto future = this->thread_pool->commit(std::bind(&exc_sim, this, node, game.get()));
+      auto future = this->thread_pool->commit(std::bind(&MCTS::exc_sim, this, node, game));
       // auto future = this->thread_pool->commit(std::bind(&NeuralNetwork::commit, this->neural_network, game.get()));
       futures[occupied] = std::move(future);
       occupied++;
