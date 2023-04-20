@@ -299,8 +299,9 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game) {
 
   std::vector<std::future<void>> futures(this->thread_pool->get_idl_num());
   int occupied = 0;
+  int completed = 0;
 
-  for (unsigned int i = 0; i < this->num_mcts_sims; i++) {
+  while (completed < this->num_mcts_sims) {
     auto node = this->root.get();
 
     while (true) {
@@ -326,7 +327,7 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game) {
     }
     else {
       if (occupied < futures.size()) {
-        auto future = this->thread_pool->commit(std::bind(&exc_sim, this, game.get()));
+        auto future = this->thread_pool->commit(std::bind(&exc_sim, this, node, game.get()));
         // auto future = this->thread_pool->commit(std::bind(&NeuralNetwork::commit, this->neural_network, game.get()));
         futures[occupied] = std::move(future);
         occupied++;
@@ -339,6 +340,8 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game) {
             if (future_is_ready(futures[j])) {
               auto result = futures[j].get();
               result[0]->backup(-result[1]);
+              completed++;
+              occupied--;
               break;
             }
           }
@@ -346,9 +349,6 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game) {
             break;
           }
         }
-
-        auto future = this->thread_pool->commit(std::bind(&exc_sim, this, game.get()));
-        futures[j] = std::move(future);
       }
     }
   }

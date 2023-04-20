@@ -24,6 +24,7 @@ class TreeNode {
   unsigned int select(double c_puct, double c_virtual_loss);
   void expand(const std::vector<double> &action_priors);
   void backup(double leaf_value);
+  std::pair<TreeNode*, double> exc_sim(TreeNode* node, Gomoku game);
 
   double get_value(double c_puct, double c_virtual_loss,
                    unsigned int sum_n_visited) const;
