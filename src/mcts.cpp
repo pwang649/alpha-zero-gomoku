@@ -171,10 +171,10 @@ MCTS::MCTS(NeuralNetwork *neural_network, unsigned int thread_num, double c_puct
       num_mcts_sims(num_mcts_sims),
       c_virtual_loss(c_virtual_loss),
       action_size(action_size),
-      root(new TreeNode(nullptr, 1., action_size), MCTS::tree_deleter),
-      selection_time(0),
-      expansion_time(0),
-      backprop_time(0) {}
+      root(new TreeNode(nullptr, 1., action_size), MCTS::tree_deleter) {}
+      //selection_time(0),
+      //expansion_time(0),
+      //backprop_time(0) {}
 
 void MCTS::update_with_move(int last_action)
 {
@@ -312,7 +312,7 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
   auto end = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>(end - begin);
 
-  selection_time += duration.count();
+  // selection_time += duration.count();
 
   // get game status
   auto status = game->get_game_status();
@@ -387,7 +387,7 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
   end = high_resolution_clock::now();
   duration = duration_cast<microseconds>(end - begin);
 
-  backprop_time += duration.count();
+  // backprop_time += duration.count();
 
   return;
 }
