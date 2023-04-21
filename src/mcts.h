@@ -36,10 +36,10 @@ class TreeNode {
   bool is_leaf;
   std::mutex lock;
 
-  std::atomic<unsigned int> n_visited;
+  int n_visited;
   double p_sa;
   double q_sa;
-  std::atomic<int> virtual_loss;
+  int virtual_loss;
 };
 
 class MCTS {
@@ -51,7 +51,7 @@ class MCTS {
   void update_with_move(int last_move);
 
  private:
-  void simulate(std::shared_ptr<Gomoku> game);
+  void simulate(Gomoku *gomoku);
   static void tree_deleter(TreeNode *t);
   std::pair<TreeNode*, double> exc_sim(TreeNode* node, std::shared_ptr<Gomoku> game);
 

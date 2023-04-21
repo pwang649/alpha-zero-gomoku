@@ -21,9 +21,9 @@ config = {
     'batch_size': 512,                          # batch size
 
     # train
-    'num_iters': 10000,                         # train iterations
-    'num_eps': 10,                              # self play times in per iter
-    'num_train_threads': 10,                    # self play in parallel
+    'num_iters': 1,                         # train iterations
+    'num_eps': 1,                              # self play times in per iter
+    'num_train_threads': 1,                    # self play in parallel
     'num_explore': 5,                           # explore step in a game
     'temp': 1,                                  # temperature
     'dirichlet_alpha': 0.3,                     # action noise in self play games
