@@ -344,7 +344,6 @@ void MCTS::simulate(Gomoku *gomoku)
 {
 
   std::vector<std::future<std::pair<TreeNode *, double>>> futures(this->thread_pool->get_idl_num());
-  int occupied = 0;
   int completed = 0;
   int available = 0;
 
@@ -379,34 +378,25 @@ void MCTS::simulate(Gomoku *gomoku)
     }
     else
     {
-      // if (occupied < futures.size()) {
       auto future = this->thread_pool->commit(std::bind(&MCTS::exc_sim, this, node, game));
-      // auto future = this->thread_pool->commit(std::bind(&NeuralNetwork::commit, this->neural_network, game.get()));
       futures[available] = std::move(future);
-      occupied++;
       available++;
-      // }
-      if (occupied >= futures.size())
+      
+      if (this->thread_pool->get_idl_num() == 0)
       {
         // wait for one thread to finish
-        unsigned int j = 0;
-        while (true)
+        while (this->thread_pool->get_idl_num() == 0)
         {
-          for (j = 0; j < futures.size(); j++)
+        }
+        for (unsigned int j = 0; j < futures.size(); j++)
+        {
+          if (future_is_ready(futures[j]))
           {
-            if (future_is_ready(futures[j]))
-            {
-              auto result = futures[j].get();
+            auto result = futures[j].get();
 
-              result.first->backup(-result.second);
-              completed++;
-              occupied--;
-              available = j;
-              break;
-            }
-          }
-          if (j < futures.size())
-          {
+            result.first->backup(-result.second);
+            completed++;
+            available = j;
             break;
           }
         }
@@ -414,75 +404,4 @@ void MCTS::simulate(Gomoku *gomoku)
     }
   }
   return;
-
-  // auto node = this->root.get();
-
-  // while (true) {
-  //   if (node->get_is_leaf()) {
-  //     break;
-  //   }
-
-  //   // select
-  //   auto action = node->select(this->c_puct, this->c_virtual_loss);
-  //   game->execute_move(action);
-  //   node = node->children[action];
-  // }
-
-  // get game status
-  // auto status = game->get_game_status();
-  // double value = 0;
-
-  // // not end
-  // if (status[0] == 0) {
-  //   // predict action_probs and value by neural network
-  //   std::vector<double> action_priors(this->action_size, 0);
-
-  //   auto future = this->neural_network->commit(game.get());
-  //   auto result = future.get();
-
-  //   action_priors = std::move(result[0]);
-  //   value = result[1][0];
-
-  //   // mask invalid actions
-  //   auto legal_moves = game->get_legal_moves();
-  //   double sum = 0;
-  //   for (unsigned int i = 0; i < action_priors.size(); i++) {
-  //     if (legal_moves[i] == 1) {
-  //       sum += action_priors[i];
-  //     } else {
-  //       action_priors[i] = 0;
-  //     }
-  //   }
-
-  //   // renormalization
-  //   if (sum > FLT_EPSILON) {
-  //     std::for_each(action_priors.begin(), action_priors.end(),
-  //                   [sum](double &x) { x /= sum; });
-  //   } else {
-  //     // all masked
-
-  //     // NB! All valid moves may be masked if either your NNet architecture is
-  //     // insufficient or you've get overfitting or something else. If you have
-  //     // got dozens or hundreds of these messages you should pay attention to
-  //     // your NNet and/or training process.
-  //     std::cout << "All valid moves were masked, do workaround." << std::endl;
-
-  //     sum = std::accumulate(legal_moves.begin(), legal_moves.end(), 0);
-  //     for (unsigned int i = 0; i < action_priors.size(); i++) {
-  //       action_priors[i] = legal_moves[i] / sum;
-  //     }
-  //   }
-
-  //   // expand
-  //   node->expand(action_priors);
-
-  // } else {
-  //   // end
-  //   auto winner = status[1];
-  //   value = (winner == 0 ? 0 : (winner == game->get_current_color() ? 1 : -1));
-  // }
-
-  // // value(parent -> node) = -value
-  // node->backup(-value);
-  // return;
 }
