@@ -322,7 +322,7 @@ std::pair<TreeNode *, std::pair<double, std::vector<double>>> MCTS::exc_sim(Tree
 void MCTS::simulate(Gomoku *gomoku)
 {
 
-  std::pair<TreeNode *, std::pair<double, std::vector<double>>> futures(this->thread_pool->get_idl_num());
+  std::vector<std::future<std::pair<TreeNode *, std::pair<double, std::vector<double>>>>> futures(this->thread_pool->get_idl_num());
   int completed = 0;
   int occupied = 0;
   int available = 0;
