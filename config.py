@@ -2,17 +2,17 @@ config = {
     # gomoku
     'n': 15,                                    # board size
     'n_in_row': 5,                              # n in row
-    'use_gui': True,                           # show gomoku gui in training mode
+    'use_gui': False,                           # show gomoku gui in training mode
 
     # mcts
-    'libtorch_use_gpu' : True,                  # libtorch use cuda
+    'libtorch_use_gpu' : False,                  # libtorch use cuda
     'num_mcts_threads': 4,                      # mcts threads number
     'num_mcts_sims': 1600,                      # mcts simulation times
     'c_puct': 5,                                # puct coeff
     'c_virtual_loss': 3,                        # virtual loss coeff
 
     # neural_network
-    'train_use_gpu' : True,                     # train neural network using cuda
+    'train_use_gpu' : False,                     # train neural network using cuda
     'lr': 0.001,                                # learning rate
     'l2': 0.0001,                               # L2
     'num_channels': 256,                        # convolution neural network channel size
