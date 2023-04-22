@@ -345,6 +345,7 @@ void MCTS::simulate(Gomoku *gomoku)
 
   std::vector<std::future<std::pair<TreeNode *, double>>> futures(this->thread_pool->get_idl_num());
   int completed = 0;
+  int occupied = 0;
   int available = 0;
 
   while (completed < this->num_mcts_sims)
@@ -380,9 +381,10 @@ void MCTS::simulate(Gomoku *gomoku)
     {
       auto future = this->thread_pool->commit(std::bind(&MCTS::exc_sim, this, node, game));
       futures[available] = std::move(future);
+      occupied++;
       available++;
-      
-      if (this->thread_pool->get_idl_num() == 0)
+      // }
+      if (occupied >= futures.size())
       {
         // wait for one thread to finish
         while (this->thread_pool->get_idl_num() == 0)
@@ -396,6 +398,7 @@ void MCTS::simulate(Gomoku *gomoku)
 
             result.first->backup(-result.second);
             completed++;
+            occupied--;
             available = j;
             break;
           }
