@@ -375,7 +375,7 @@ void MCTS::simulate(Gomoku *gomoku)
             {
               auto result = futures[j].get();
               // expand
-              node->expand(result.second.second);
+              result.first->expand(result.second.second);
               result.first->backup(-result.second.first);
               completed++;
               occupied--;
