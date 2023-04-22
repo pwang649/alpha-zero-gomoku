@@ -96,7 +96,7 @@ void TreeNode::expand(const std::vector<double> &action_priors)
 {
   {
     // get lock
-    std::lock_guard<std::mutex> lock(this->lock);
+    // std::lock_guard<std::mutex> lock(this->lock);
 
     if (this->is_leaf)
     {
@@ -214,25 +214,6 @@ void MCTS::tree_deleter(TreeNode *t)
 
 std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp)
 {
-  // submit simulate tasks to thread_pool
-  // std::vector<std::future<void>> futures;
-
-  // for (unsigned int i = 0; i < this->num_mcts_sims; i++) {
-  //   // copy gomoku
-  //   auto game = std::make_shared<Gomoku>(*gomoku);
-  //   auto future =
-  //       this->thread_pool->commit(std::bind(&MCTS::simulate, this, game));
-
-  //   // future can't copy
-  //   futures.emplace_back(std::move(future));
-  // }
-
-  // // wait simulate
-  // for (unsigned int i = 0; i < futures.size(); i++) {
-  //   futures[i].wait();
-  // }
-
-  // auto game = std::make_shared<Gomoku>(*gomoku);
   auto begin = high_resolution_clock::now();
 
   simulate(gomoku);
@@ -292,7 +273,7 @@ bool future_is_ready(std::future<R> const &f)
 }
 
 // expansion + simulation
-std::pair<TreeNode *, double> MCTS::exc_sim(TreeNode *node, std::shared_ptr<Gomoku> game)
+std::pair<TreeNode *, std::pair<double, std::vector<double>>> MCTS::exc_sim(TreeNode *node, std::shared_ptr<Gomoku> game)
 {
   std::vector<double> action_priors(this->action_size, 0);
 
@@ -334,10 +315,8 @@ std::pair<TreeNode *, double> MCTS::exc_sim(TreeNode *node, std::shared_ptr<Gomo
       action_priors[i] = legal_moves[i] / sum;
     }
   }
-  // expand
-  node->expand(action_priors);
 
-  return std::make_pair(node, value);
+  return std::make_pair(node, std::make_pair(value, action_priors));
 }
 
 void MCTS::simulate(Gomoku *gomoku)
@@ -395,8 +374,9 @@ void MCTS::simulate(Gomoku *gomoku)
             if (future_is_ready(futures[j]))
             {
               auto result = futures[j].get();
-
-              result.first->backup(-result.second);
+              // expand
+              node->expand(result.second.second);
+              result.first->backup(-result.second.first);
               completed++;
               occupied--;
               available = j;

@@ -53,7 +53,7 @@ class MCTS {
  private:
   void simulate(Gomoku *gomoku);
   static void tree_deleter(TreeNode *t);
-  std::pair<TreeNode*, double> exc_sim(TreeNode* node, std::shared_ptr<Gomoku> game);
+  std::pair<TreeNode *, std::pair<double, std::vector<double>>> exc_sim(TreeNode* node, std::shared_ptr<Gomoku> game);
 
   // variables
   std::unique_ptr<TreeNode, decltype(MCTS::tree_deleter) *> root;
