@@ -387,19 +387,24 @@ void MCTS::simulate(Gomoku *gomoku)
       if (occupied >= futures.size())
       {
         // wait for one thread to finish
-        while (this->thread_pool->get_idl_num() == 0)
+        unsigned int j = 0;
+        while (true)
         {
-        }
-        for (unsigned int j = 0; j < futures.size(); j++)
-        {
-          if (future_is_ready(futures[j]))
+          for (j = 0; j < futures.size(); j++)
           {
-            auto result = futures[j].get();
+            if (future_is_ready(futures[j]))
+            {
+              auto result = futures[j].get();
 
-            result.first->backup(-result.second);
-            completed++;
-            occupied--;
-            available = j;
+              result.first->backup(-result.second);
+              completed++;
+              occupied--;
+              available = j;
+              break;
+            }
+          }
+          if (j < futures.size())
+          {
             break;
           }
         }
