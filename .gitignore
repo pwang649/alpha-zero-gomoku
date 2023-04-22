@@ -3,6 +3,7 @@ __pycache__
 .vscode
 .vs
 build
+models
 .idea
 libtorch
 src/learner.pyc
