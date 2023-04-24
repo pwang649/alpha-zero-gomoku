@@ -295,7 +295,7 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
   }
 
   auto end = high_resolution_clock::now();
-  duration = duration_cast<microseconds>(end - begin);
+  auto duration = duration_cast<microseconds>(end - begin);
 
   select_duration += duration.count();
 
