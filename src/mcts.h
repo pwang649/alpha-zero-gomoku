@@ -59,7 +59,7 @@ class MCTS {
   unsigned int action_size;
   unsigned int num_mcts_sims;
   double c_puct;
-  int selection_time;
-  int expansion_time;
-  int backprop_time;
+  int select_duration;
+  int exc_sim_duration;
+  int backup_duration;
 };

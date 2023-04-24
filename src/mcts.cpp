@@ -152,9 +152,9 @@ MCTS::MCTS(NeuralNetwork *neural_network, double c_puct,
       num_mcts_sims(num_mcts_sims),
       action_size(action_size),
       root(new TreeNode(nullptr, 1., action_size), MCTS::tree_deleter),
-      selection_time(0),
-      expansion_time(0),
-      backprop_time(0) {}
+      select_duration(0),
+      exc_sim_duration(0),
+      backup_duration(0) {}
 
 void MCTS::update_with_move(int last_action)
 {
@@ -198,6 +198,10 @@ void MCTS::tree_deleter(TreeNode *t)
 
 std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp)
 {
+  select_duration = 0;
+  exc_sim_duration = 0;
+  backup_duration = 0;
+  
   auto begin = high_resolution_clock::now();
 
   for (unsigned int i = 0; i < this->num_mcts_sims; i++)
@@ -259,9 +263,9 @@ std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp)
 void MCTS::simulate(std::shared_ptr<Gomoku> game)
 {
   // execute one simulation
-  auto node = this->root.get();
 
   auto begin = high_resolution_clock::now();
+  auto node = this->root.get();
 
   while (true)
   {
@@ -277,14 +281,15 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
   }
 
   auto end = high_resolution_clock::now();
-  auto duration = duration_cast<microseconds>(end - begin);
+  duration = duration_cast<microseconds>(end - begin);
 
-  selection_time += duration.count();
+  select_duration += duration.count();
 
   // get game status
   auto status = game->get_game_status();
   double value = 0;
 
+  begin = high_resolution_clock::now();
   // not end
   if (status[0] == 0)
   {
@@ -346,6 +351,10 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
     value = (winner == 0 ? 0 : (winner == game->get_current_color() ? 1 : -1));
   }
 
+  end = high_resolution_clock::now();
+  duration = duration_cast<microseconds>(end - begin);
+  exc_sim_duration += duration.count();
+
   begin = high_resolution_clock::now();
 
   // value(parent -> node) = -value
@@ -353,8 +362,9 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
 
   end = high_resolution_clock::now();
   duration = duration_cast<microseconds>(end - begin);
+  backup_duration += duration.count();
 
-  backprop_time += duration.count();
+  // backprop_time += duration.count();
 
   return;
 }
