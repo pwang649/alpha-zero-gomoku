@@ -214,7 +214,21 @@ std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp)
   auto end = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>(end - begin);
 
+  auto sum = select_duration+exc_sim_duration+backup_duration;
+
   std::cout << "Time for one Run: " << duration.count() << " ns." << std::endl;
+  std::cout << "Select time: " << select_duration << "ns." << std::endl;
+  std::cout << "Exc-Sim time: " << exc_sim_duration << "ns." << std::endl;
+  std::cout << "Backup time: " << backup_duration << "ns." << std::endl;
+  std::cout << "In total: " << sum << "ns." << std::endl;
+  std::cout << "Compare to the time for one run, " << std::endl;
+  std::cout << "Select takes " << select_duration*100/duration.count() << "%\n";
+  std::cout << "Exc_Sim takes " << exc_sim_duration*100/duration.count() << "%\n";
+  std::cout << "Backup takes " << backup_duration*100/duration.count() << "%\n";
+  std::cout << "Compare to the sum of these three parts, " << std::endl;
+  std::cout << "Select takes " << select_duration*100/sum << "%\n";
+  std::cout << "Exc_Sim takes " << exc_sim_duration*100/sum << "%\n";
+  std::cout << "Backup takes " << backup_duration*100/sum << "%\n" << std::endl;
 
   // calculate probs
   std::vector<double> action_probs(gomoku->get_action_size(), 0);
