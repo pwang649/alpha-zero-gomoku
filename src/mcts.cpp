@@ -302,6 +302,8 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
   // get game status
   auto status = game->get_game_status();
   double value = 0;
+  bool game_end = false;
+  std::vector<double> ap;
 
   begin = high_resolution_clock::now();
   // not end
@@ -356,11 +358,13 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
     }
 
     // expand
-    node->expand(action_priors);
+    ap = action_priors;
+    // node->expand(action_priors);
   }
   else
   {
     // end
+    game_end = true;
     auto winner = status[1];
     value = (winner == 0 ? 0 : (winner == game->get_current_color() ? 1 : -1));
   }
@@ -370,6 +374,8 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
   exc_sim_duration += duration.count();
 
   begin = high_resolution_clock::now();
+
+  if (!game_end) node->expand(ap);
 
   // value(parent -> node) = -value
   node->backup(-value);
