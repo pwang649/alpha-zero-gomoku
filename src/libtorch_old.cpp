@@ -1,7 +1,6 @@
 #include <libtorch.h>
 // #include <ATen/cuda/CUDAContext.h>
 // #include <ATen/cuda/CUDAGuard.h>
-#include <c10/cuda/CUDAStream.h>
 
 #include <iostream>
 
@@ -87,7 +86,7 @@ void NeuralNetwork::infer() {
   std::vector<std::promise<return_type>> promises;
 
   bool timeout = false;
-  // while (states.size() < this->batch_size && !timeout) {
+  while (states.size() < this->batch_size && !timeout) {
     // pop task
     {
       std::unique_lock<std::mutex> lock(this->lock);
@@ -107,7 +106,7 @@ void NeuralNetwork::infer() {
         timeout = true;
       }
     }
-  // }
+  }
 
   // inputs empty
   if (states.size() == 0) {
@@ -115,8 +114,6 @@ void NeuralNetwork::infer() {
   }
 
   // infer
-  at::cuda::CUDAStream myStream = at::cuda::getStreamFromPool();
-  at::cuda::setCurrentCUDAStream(myStream);
   std::vector<torch::jit::IValue> inputs{
       this->use_gpu ? torch::cat(states, 0).to(at::kCUDA)
                     : torch::cat(states, 0)};
