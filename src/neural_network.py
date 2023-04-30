@@ -79,6 +79,8 @@ class NeuralNetWork(nn.Module):
         self.v_fc2 = nn.Linear(256, 1)
         self.tanh = nn.Tanh()
 
+        torch.set_num_threads(1)
+
     def forward(self, inputs):
         # residual block
         out = self.res_layers(inputs)
