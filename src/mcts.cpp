@@ -327,9 +327,14 @@ void MCTS::simulate(Gomoku *gomoku)
   int occupied = 0;
   int available = 0;
 
+  auto selection_time = 0;
+  auto inference_time = 0;
+  auto expand_backup_time = 0;
+
   while (completed < this->num_mcts_sims)
   {
     auto game = std::make_shared<Gomoku>(*gomoku);
+    auto begin = high_resolution_clock::now();
     auto node = this->root.get();
 
     while (true)
@@ -344,6 +349,8 @@ void MCTS::simulate(Gomoku *gomoku)
       game->execute_move(action);
       node = node->children[action];
     }
+    auto end = high_resolution_clock::now();
+    selection_time += duration_cast<microseconds>(end - begin).count();
 
     auto status = game->get_game_status();
     double value = 0;
@@ -375,8 +382,11 @@ void MCTS::simulate(Gomoku *gomoku)
             {
               auto result = futures[j].get();
               // expand
+              begin = high_resolution_clock::now();
               result.first->expand(result.second.second);
               result.first->backup(-result.second.first);
+              end = high_resolution_clock::now();
+              expand_backup_time += duration_cast<microseconds>(end - begin).count();
               completed++;
               occupied--;
               available = j;
@@ -391,5 +401,9 @@ void MCTS::simulate(Gomoku *gomoku)
       }
     }
   }
+
+
+  std::cout << "Selection time: " << selection_time << "us." << std::endl;
+  std::cout << "Expand Backup time: " << expand_backup_time << "us." << std::endl;
   return;
 }
