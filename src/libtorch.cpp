@@ -13,28 +13,35 @@ NeuralNetwork::NeuralNetwork(std::string model_path, bool use_gpu,
       use_gpu(use_gpu),
       batch_size(batch_size),
       running(true),
-      loop(nullptr) {
-  if (this->use_gpu) {
+      loop(nullptr)
+{
+  if (this->use_gpu)
+  {
     // move to CUDA
     this->module->to(at::kCUDA);
   }
+  at::set_num_interop_threads(1);
+  at::set_num_threads(1);
+  omp_set_num_threads(1);
+  omp_set_dynamic(0);
+  omp_set_nested(0);
 }
 
-NeuralNetwork::~NeuralNetwork() {
+NeuralNetwork::~NeuralNetwork()
+{
 }
 
-std::vector<std::vector<double>> NeuralNetwork::commit(Gomoku* gomoku) {
+std::vector<std::vector<double>> NeuralNetwork::commit(Gomoku *gomoku)
+{
   int n = gomoku->get_n();
 
   // convert data format
   auto board = gomoku->get_board();
   std::vector<int> board0;
-  for (unsigned int i = 0; i < board.size(); i++) {
+  for (unsigned int i = 0; i < board.size(); i++)
+  {
     board0.insert(board0.end(), board[i].begin(), board[i].end());
   }
-
-  at::cuda::CUDAStream myStream = at::cuda::getStreamFromPool(false, 0);
-  at::cuda::setCurrentCUDAStream(myStream);
 
   torch::Tensor temp =
       torch::from_blob(&board0[0], {1, 1, n, n}, torch::dtype(torch::kInt32));
@@ -45,14 +52,16 @@ std::vector<std::vector<double>> NeuralNetwork::commit(Gomoku* gomoku) {
   int last_move = gomoku->get_last_move();
   int cur_player = gomoku->get_current_color();
 
-  if (cur_player == -1) {
+  if (cur_player == -1)
+  {
     std::swap(state0, state1);
   }
 
   torch::Tensor state2 =
       torch::zeros({1, 1, n, n}, torch::dtype(torch::kFloat32));
 
-  if (last_move != -1) {
+  if (last_move != -1)
+  {
     state2[0][0][last_move / n][last_move % n] = 1;
   }
 
@@ -60,6 +69,8 @@ std::vector<std::vector<double>> NeuralNetwork::commit(Gomoku* gomoku) {
   torch::Tensor states = torch::cat({state0, state1, state2}, 1);
 
   // infer
+  at::cuda::CUDAStream myStream = at::cuda::getStreamFromPool();
+  at::cuda::setCurrentCUDAStream(myStream);
   std::vector<torch::jit::IValue> inputs{
       this->use_gpu ? torch::cat(states, 0).to(at::kCUDA)
                     : torch::cat(states, 0)};
@@ -77,8 +88,8 @@ std::vector<std::vector<double>> NeuralNetwork::commit(Gomoku* gomoku) {
   torch::Tensor p = p_batch[0];
   torch::Tensor v = v_batch[0];
 
-  std::vector<double> prob(static_cast<float*>(p.data_ptr()),
-                            static_cast<float*>(p.data_ptr()) + p.size(0));
+  std::vector<double> prob(static_cast<float *>(p.data_ptr()),
+                           static_cast<float *>(p.data_ptr()) + p.size(0));
   std::vector<double> value{v.item<float>()};
 
   return {std::move(prob), std::move(value)};
@@ -86,5 +97,6 @@ std::vector<std::vector<double>> NeuralNetwork::commit(Gomoku* gomoku) {
 
 // TODO: use lock-free queue
 // https://github.com/cameron314/concurrentqueue
-void NeuralNetwork::infer() {
+void NeuralNetwork::infer()
+{
 }
