@@ -20,11 +20,6 @@ NeuralNetwork::NeuralNetwork(std::string model_path, bool use_gpu,
     // move to CUDA
     this->module->to(at::kCUDA);
   }
-  at::set_num_interop_threads(1);
-  at::set_num_threads(1);
-  omp_set_num_threads(1);
-  omp_set_dynamic(0);
-  omp_set_nested(0);
 }
 
 NeuralNetwork::~NeuralNetwork()

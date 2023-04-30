@@ -6,7 +6,7 @@ config = {
 
     # mcts
     'libtorch_use_gpu' : False,                  # libtorch use cuda
-    'num_mcts_threads': 4,                      # mcts threads number
+    'num_mcts_threads': 64,                      # mcts threads number
     'num_mcts_sims': 1600,                      # mcts simulation times
     'c_puct': 5,                                # puct coeff
     'c_virtual_loss': 3,                        # virtual loss coeff
