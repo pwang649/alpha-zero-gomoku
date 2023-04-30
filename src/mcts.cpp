@@ -277,7 +277,8 @@ std::pair<TreeNode *, std::pair<double, std::vector<double>>> MCTS::exc_sim(Tree
 {
   std::vector<double> action_priors(this->action_size, 0);
 
-  std::vector<std::vector<double>> result = this->neural_network->commit(game.get());
+  auto future = this->neural_network->commit(game.get());
+  auto result = future.get();
 
   action_priors = std::move(result[0]);
   double value = result[1][0];
@@ -390,5 +391,6 @@ void MCTS::simulate(Gomoku *gomoku)
       }
     }
   }
+  std::cout << "total inference time: " << this->neural_network->get_inf_time() << std::endl;
   return;
 }

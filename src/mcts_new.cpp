@@ -277,8 +277,7 @@ std::pair<TreeNode *, std::pair<double, std::vector<double>>> MCTS::exc_sim(Tree
 {
   std::vector<double> action_priors(this->action_size, 0);
 
-  auto future = this->neural_network->commit(game.get());
-  auto result = future.get();
+  std::vector<std::vector<double>> result = this->neural_network->commit(game.get());
 
   action_priors = std::move(result[0]);
   double value = result[1][0];
