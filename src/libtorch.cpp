@@ -18,21 +18,12 @@ NeuralNetwork::NeuralNetwork(std::string model_path, bool use_gpu,
     // move to CUDA
     this->module->to(at::kCUDA);
   }
-
-  // run infer thread
-  this->loop = std::make_unique<std::thread>([this] {
-    while (this->running) {
-      this->infer();
-    }
-  });
 }
 
 NeuralNetwork::~NeuralNetwork() {
-  this->running = false;
-  this->loop->join();
 }
 
-std::future<NeuralNetwork::return_type> NeuralNetwork::commit(Gomoku* gomoku) {
+std::vector<std::vector<double>> NeuralNetwork::commit(Gomoku* gomoku) {
   int n = gomoku->get_n();
 
   // convert data format
@@ -65,50 +56,6 @@ std::future<NeuralNetwork::return_type> NeuralNetwork::commit(Gomoku* gomoku) {
   // torch::Tensor states = torch::cat({state0, state1}, 1);
   torch::Tensor states = torch::cat({state0, state1, state2}, 1);
 
-  // emplace task
-  std::promise<return_type> promise;
-  auto ret = promise.get_future();
-
-  {
-    std::lock_guard<std::mutex> lock(this->lock);
-    tasks.emplace(std::make_pair(states, std::move(promise)));
-  }
-
-  this->cv.notify_all();
-
-  return ret;
-}
-
-// TODO: use lock-free queue
-// https://github.com/cameron314/concurrentqueue
-void NeuralNetwork::infer() {
-  // get inputs
-  std::vector<torch::Tensor> states;
-  std::vector<std::promise<return_type>> promises;
-
-  bool timeout = false;
-  // while (states.size() < this->batch_size && !timeout) {
-    // pop task
-    {
-      std::unique_lock<std::mutex> lock(this->lock);
-      if (this->cv.wait_for(lock, 1ms,
-                            [this] { return this->tasks.size() > 0; })) {
-        while (states.size() < this->batch_size && this->tasks.size() > 0){
-          auto task = std::move(this->tasks.front());
-          states.emplace_back(std::move(task.first));
-          promises.emplace_back(std::move(task.second));
-
-          this->tasks.pop();
-        }
-
-      } else {
-        // timeout
-        // std::cout << "timeout" << std::endl;
-        timeout = true;
-      }
-    }
-  // }
-
   // inputs empty
   if (states.size() == 0) {
     return;
@@ -131,15 +78,17 @@ void NeuralNetwork::infer() {
       result->elements()[1].toTensor().toType(torch::kFloat32).to(at::kCPU);
 
   // set promise value
-  for (unsigned int i = 0; i < promises.size(); i++) {
-    torch::Tensor p = p_batch[i];
-    torch::Tensor v = v_batch[i];
+  torch::Tensor p = p_batch[0];
+  torch::Tensor v = v_batch[0];
 
-    std::vector<double> prob(static_cast<float*>(p.data_ptr()),
-                             static_cast<float*>(p.data_ptr()) + p.size(0));
-    std::vector<double> value{v.item<float>()};
-    return_type temp{std::move(prob), std::move(value)};
+  std::vector<double> prob(static_cast<float*>(p.data_ptr()),
+                            static_cast<float*>(p.data_ptr()) + p.size(0));
+  std::vector<double> value{v.item<float>()};
 
-    promises[i].set_value(std::move(temp));
-  }
+  return {std::move(prob), std::move(value)};
+}
+
+// TODO: use lock-free queue
+// https://github.com/cameron314/concurrentqueue
+void NeuralNetwork::infer() {
 }
