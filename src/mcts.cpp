@@ -277,7 +277,8 @@ std::pair<TreeNode *, std::pair<double, std::vector<double>>> MCTS::exc_sim(Tree
 {
   std::vector<double> action_priors(this->action_size, 0);
 
-  std::vector<std::vector<double>> result = this->neural_network->commit(game.get());
+  auto future = this->neural_network->commit(game.get());
+  auto result = future.get();
 
   action_priors = std::move(result[0]);
   double value = result[1][0];
@@ -326,9 +327,15 @@ void MCTS::simulate(Gomoku *gomoku)
   int occupied = 0;
   int available = 0;
 
+  // auto selection_time = 0;
+  // auto inference_time = 0;
+  // auto expand_backup_time = 0;
+	
+  // this->neural_network->set_inf_time(0);
   while (completed < this->num_mcts_sims)
   {
     auto game = std::make_shared<Gomoku>(*gomoku);
+    // auto begin = high_resolution_clock::now();
     auto node = this->root.get();
 
     while (true)
@@ -343,6 +350,8 @@ void MCTS::simulate(Gomoku *gomoku)
       game->execute_move(action);
       node = node->children[action];
     }
+    // auto end = high_resolution_clock::now();
+    // selection_time += duration_cast<microseconds>(end - begin).count();
 
     auto status = game->get_game_status();
     double value = 0;
@@ -374,8 +383,11 @@ void MCTS::simulate(Gomoku *gomoku)
             {
               auto result = futures[j].get();
               // expand
+              // begin = high_resolution_clock::now();
               result.first->expand(result.second.second);
               result.first->backup(-result.second.first);
+              // end = high_resolution_clock::now();
+              // expand_backup_time += duration_cast<microseconds>(end - begin).count();
               completed++;
               occupied--;
               available = j;
@@ -390,5 +402,6 @@ void MCTS::simulate(Gomoku *gomoku)
       }
     }
   }
+  // std::cout << "total inference time: " << this->neural_network->get_inf_time() << std::endl;
   return;
 }

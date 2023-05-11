@@ -6,7 +6,8 @@ config = {
 
     # mcts
     'libtorch_use_gpu' : True,                  # libtorch use cuda
-    'num_mcts_threads': 32,                      # mcts threads number
+    'inference_batch_size': -1,                 # -1: default to be num_mcts_thread
+    'num_mcts_threads': 32,                     # mcts threads number
     'num_mcts_sims': 1600,                      # mcts simulation times
     'c_puct': 5,                                # puct coeff
     'c_virtual_loss': 3,                        # virtual loss coeff
@@ -21,9 +22,9 @@ config = {
     'batch_size': 512,                          # batch size
 
     # train
-    'num_iters': 1,                         # train iterations
-    'num_eps': 1,                              # self play times in per iter
-    'num_train_threads': 1,                    # self play in parallel
+    'num_iters': 1,                             # train iterations
+    'num_eps': 1,                               # self play times in per iter
+    'num_train_threads': 1,                     # self play in parallel
     'num_explore': 5,                           # explore step in a game
     'temp': 1,                                  # temperature
     'dirichlet_alpha': 0.3,                     # action noise in self play games

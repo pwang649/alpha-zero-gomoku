@@ -49,6 +49,7 @@ class Leaner():
         self.examples_buffer = deque([], maxlen=config['examples_buffer_max_len'])
 
         # mcts
+        self.inference_batch_size = config['inference_batch_size']
         self.num_mcts_sims = config['num_mcts_sims']
         self.c_puct = config['c_puct']
         self.c_virtual_loss = config['c_virtual_loss']
@@ -82,7 +83,7 @@ class Leaner():
 
             # self play in parallel
             libtorch = NeuralNetwork('./models/checkpoint.pt',
-                                     self.libtorch_use_gpu, self.num_mcts_threads * self.num_train_threads)
+                                     self.libtorch_use_gpu, self.num_mcts_threads * self.num_train_threads if self.inference_batch_size == -1 else self.inference_batch_size)
             itr_examples = []
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_train_threads) as executor:
                 futures = [executor.submit(self.self_play, 1 if itr % 2 else -1, libtorch, k == 1) for k in range(1, self.num_eps + 1)]
