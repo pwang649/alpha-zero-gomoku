@@ -298,7 +298,7 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
   // execute one simulation
   auto node = this->root.get();
 
-  auto begin = high_resolution_clock::now();
+  // auto begin = high_resolution_clock::now();
 
   while (true)
   {
@@ -313,8 +313,8 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
     node = node->children[action];
   }
 
-  auto end = high_resolution_clock::now();
-  auto duration = duration_cast<microseconds>(end - begin);
+  // auto end = high_resolution_clock::now();
+  // auto duration = duration_cast<microseconds>(end - begin);
 
   // selection_time += duration.count();
 
@@ -328,7 +328,8 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
     // predict action_probs and value by neural network
     std::vector<double> action_priors(this->action_size, 0);
 
-    std::vector<std::vector<double>> result = this->neural_network->commit(game.get());
+    auto future = this->neural_network->commit(game.get());
+    auto result = future.get();
 
     action_priors = std::move(result[0]);
     value = result[1][0];
@@ -382,13 +383,13 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
     value = (winner == 0 ? 0 : (winner == game->get_current_color() ? 1 : -1));
   }
 
-  begin = high_resolution_clock::now();
+  // begin = high_resolution_clock::now();
 
   // value(parent -> node) = -value
   node->backup(-value);
 
-  end = high_resolution_clock::now();
-  duration = duration_cast<microseconds>(end - begin);
+  // end = high_resolution_clock::now();
+  // duration = duration_cast<microseconds>(end - begin);
 
   // backprop_time += duration.count();
 

@@ -2,28 +2,30 @@ config = {
     # gomoku
     'n': 15,                                    # board size
     'n_in_row': 5,                              # n in row
-    'use_gui': True,                           # show gomoku gui in training mode
+    'use_gui': True,                            # show gomoku gui in training mode
 
     # mcts
-    'libtorch_use_gpu' : True,                  # libtorch use cuda
+    'libtorch_use_gpu': True,                   # libtorch use cuda
+    'inference_batch_size': -1,                 # -1: default to be num_mcts_thread
     'num_mcts_threads': 4,                      # mcts threads number
     'num_mcts_sims': 1600,                      # mcts simulation times
     'c_puct': 5,                                # puct coeff
     'c_virtual_loss': 3,                        # virtual loss coeff
 
     # neural_network
-    'train_use_gpu' : True,                     # train neural network using cuda
+    'train_use_gpu': True,                      # train neural network using cuda
     'lr': 0.001,                                # learning rate
     'l2': 0.0001,                               # L2
-    'num_channels': 256,                        # convolution neural network channel size
-    'num_layers' : 4,                           # residual layer number
+    # convolution neural network channel size
+    'num_channels': 256,
+    'num_layers': 4,                            # residual layer number
     'epochs': 1.5,                              # train epochs
     'batch_size': 512,                          # batch size
 
     # train
-    'num_iters': 1,                         # train iterations 10000
-    'num_eps': 1,                              # self play times in per iter 10
-    'num_train_threads': 1,                    # self play in parallel 10
+    'num_iters': 1,                             # train iterations 10000
+    'num_eps': 1,                               # self play times in per iter 10
+    'num_train_threads': 1,                     # self play in parallel 10
     'num_explore': 5,                           # explore step in a game
     'temp': 1,                                  # temperature
     'dirichlet_alpha': 0.3,                     # action noise in self play games

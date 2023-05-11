@@ -328,8 +328,7 @@ void MCTS::simulate(std::shared_ptr<Gomoku> game)
     // predict action_probs and value by neural network
     std::vector<double> action_priors(this->action_size, 0);
 
-    auto future = this->neural_network->commit(game.get());
-    auto result = future.get();
+    std::vector<std::vector<double>> result = this->neural_network->commit(game.get());
 
     action_priors = std::move(result[0]);
     value = result[1][0];
